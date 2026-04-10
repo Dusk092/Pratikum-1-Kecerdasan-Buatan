@@ -1,30 +1,25 @@
-# =========================
-# FIX EXPERTA
-# =========================
-import collections
-import collections.abc
-collections.Mapping = collections.abc.Mapping
-
-from experta import *
 import streamlit as st
 
 # =========================
 # CONFIG
 # =========================
-st.set_page_config(page_title="Sistem Pakar COVID", layout="wide")
+st.set_page_config(
+    page_title="Sistem Pakar COVID",
+    layout="wide"
+)
 
 # =========================
 # HEADER
 # =========================
 st.markdown("""
 <h1 style='text-align: center;'>🦠 Sistem Pakar Diagnosa Penyakit Pernapasan</h1>
-<p style='text-align: center; color: gray;'>Forward Chaining menggunakan Experta</p>
+<p style='text-align: center; color: gray;'>Forward Chaining + Weighted Rule</p>
 """, unsafe_allow_html=True)
 
 st.divider()
 
 # =========================
-# GEJALA LENGKAP
+# DATA GEJALA
 # =========================
 gejala = [
     "Apakah Anda mengalami demam?",
@@ -45,53 +40,47 @@ gejala = [
 ]
 
 # =========================
+# RULE BERBOBOT (SMART)
+# =========================
+rules = {
+    "COVID-19": {
+        0: 2,
+        1: 2,
+        2: 3,
+        5: 3,
+        6: 3,
+        8: 2
+    },
+    "Flu": {
+        0: 2,
+        1: 2,
+        3: 2,
+        4: 2,
+        11: 1,
+        12: 1
+    },
+    "Bronkitis": {
+        1: 2,
+        2: 3,
+        13: 2,
+        14: 2
+    }
+}
+
+# =========================
 # SARAN
 # =========================
 saran = {
     "COVID-19": "Isolasi mandiri dan periksa ke fasilitas kesehatan.",
     "Flu": "Istirahat, minum air hangat, dan konsumsi vitamin.",
-    "Bronkitis": "Hindari asap dan konsultasi ke dokter."
+    "Bronkitis": "Hindari asap dan segera konsultasi ke dokter."
 }
 
 # =========================
-# STATE
+# INIT STATE
 # =========================
 if "jawaban" not in st.session_state:
     st.session_state.jawaban = [False] * len(gejala)
-
-# =========================
-# EXPERTA ENGINE
-# =========================
-class DiagnosaEngine(KnowledgeEngine):
-
-    @DefFacts()
-    def fakta_awal(self):
-        for i, val in enumerate(st.session_state.jawaban):
-            yield Fact(**{f"g{i}": val})
-
-    # =========================
-    # RULE COVID (GEJALA KUAT)
-    # =========================
-    @Rule(Fact(g0=True), Fact(g1=True), Fact(g2=True),
-          Fact(g5=True), Fact(g6=True))
-    def covid(self):
-        self.declare(Fact(hasil="COVID-19"))
-
-    # =========================
-    # RULE FLU
-    # =========================
-    @Rule(Fact(g0=True), Fact(g1=True), Fact(g3=True),
-          Fact(g4=True), Fact(g11=True))
-    def flu(self):
-        self.declare(Fact(hasil="Flu"))
-
-    # =========================
-    # RULE BRONKITIS
-    # =========================
-    @Rule(Fact(g1=True), Fact(g2=True),
-          Fact(g13=True), Fact(g14=True))
-    def bronkitis(self):
-        self.declare(Fact(hasil="Bronkitis"))
 
 # =========================
 # LAYOUT
@@ -136,19 +125,30 @@ with col2:
         if total < 2:
             st.warning("⚠️ Pilih minimal 2 gejala terlebih dahulu!")
         else:
-            engine = DiagnosaEngine()
-            engine.reset()
-            engine.run()
+            skor = {}
 
-            hasil = []
+            for penyakit, gejala_rule in rules.items():
+                total_bobot = sum(gejala_rule.values())
+                skor_penyakit = 0
 
-            for fact in engine.facts.values():
-                if isinstance(fact, Fact) and "hasil" in fact:
-                    hasil.append(fact["hasil"])
+                for idx, bobot in gejala_rule.items():
+                    if st.session_state.jawaban[idx]:
+                        skor_penyakit += bobot
 
-            if hasil:
-                for h in set(hasil):
-                    st.error(f"🩺 Diagnosis: {h}")
-                    st.success(f"💡 Saran: {saran[h]}")
-            else:
-                st.info("❓ Diagnosis tidak ditemukan")
+                skor[penyakit] = (skor_penyakit / total_bobot) * 100
+
+            # ranking
+            ranking = sorted(skor.items(), key=lambda x: x[1], reverse=True)
+
+            # grafik batang
+            st.bar_chart(skor)
+
+            # tampil hasil
+            for p, val in ranking:
+                st.write(f"{p}: {val:.1f}%")
+
+            terbaik = ranking[0][0]
+
+            st.divider()
+            st.error(f"🩺 Diagnosis: {terbaik}")
+            st.success(f"💡 Saran: {saran[terbaik]}")
