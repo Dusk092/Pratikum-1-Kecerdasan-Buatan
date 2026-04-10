@@ -1,25 +1,19 @@
 import streamlit as st
+from experta import *
 
 # =========================
 # CONFIG
 # =========================
-st.set_page_config(
-    page_title="Sistem Pakar COVID",
-    layout="wide"
-)
+st.set_page_config(page_title="Sistem Pakar COVID", layout="wide")
 
 # =========================
 # HEADER
 # =========================
-st.markdown("""
-<h1 style='text-align: center;'>🦠 Sistem Pakar Diagnosa Penyakit Pernapasan</h1>
-<p style='text-align: center; color: gray;'>Forward Chaining + Weighted Rule</p>
-""", unsafe_allow_html=True)
-
-st.divider()
+st.title("🦠 Sistem Pakar Diagnosa Penyakit Pernapasan")
+st.caption("Forward Chaining menggunakan Experta")
 
 # =========================
-# DATA GEJALA
+# GEJALA
 # =========================
 gejala = [
     "Apakah Anda mengalami demam?",
@@ -28,127 +22,78 @@ gejala = [
     "Apakah Anda mengalami pilek?",
     "Apakah Anda mengalami sakit tenggorokan?",
     "Apakah Anda kehilangan penciuman?",
-    "Apakah Anda kehilangan rasa?",
-    "Apakah Anda mengalami sakit kepala?",
-    "Apakah Anda merasa lemas?",
-    "Apakah Anda mengalami nyeri otot?",
-    "Apakah Anda menggigil?",
-    "Apakah Anda mengalami hidung tersumbat?",
-    "Apakah Anda bersin-bersin?",
-    "Apakah Anda mengalami batuk berdahak?",
-    "Apakah Anda merasa dada terasa berat?"
 ]
 
 # =========================
-# RULE BERBOBOT (SMART)
-# =========================
-rules = {
-    "COVID-19": {
-        0: 2,
-        1: 2,
-        2: 3,
-        5: 3,
-        6: 3,
-        8: 2
-    },
-    "Flu": {
-        0: 2,
-        1: 2,
-        3: 2,
-        4: 2,
-        11: 1,
-        12: 1
-    },
-    "Bronkitis": {
-        1: 2,
-        2: 3,
-        13: 2,
-        14: 2
-    }
-}
-
-# =========================
-# SARAN
-# =========================
-saran = {
-    "COVID-19": "Isolasi mandiri dan periksa ke fasilitas kesehatan.",
-    "Flu": "Istirahat, minum air hangat, dan konsumsi vitamin.",
-    "Bronkitis": "Hindari asap dan segera konsultasi ke dokter."
-}
-
-# =========================
-# INIT STATE
+# STATE
 # =========================
 if "jawaban" not in st.session_state:
     st.session_state.jawaban = [False] * len(gejala)
 
 # =========================
-# LAYOUT
+# EXPERTA ENGINE
+# =========================
+class DiagnosaEngine(KnowledgeEngine):
+
+    @DefFacts()
+    def _initial_action(self):
+        for i, val in enumerate(st.session_state.jawaban):
+            yield Fact(**{f"g{i}": val})
+
+    # COVID
+    @Rule(Fact(g0=True), Fact(g1=True), Fact(g2=True), Fact(g5=True))
+    def covid(self):
+        self.declare(Fact(hasil="COVID-19"))
+
+    # Flu
+    @Rule(Fact(g0=True), Fact(g1=True), Fact(g3=True))
+    def flu(self):
+        self.declare(Fact(hasil="Flu"))
+
+    # Bronkitis
+    @Rule(Fact(g1=True), Fact(g2=True))
+    def bronkitis(self):
+        self.declare(Fact(hasil="Bronkitis"))
+
+# =========================
+# UI
 # =========================
 col1, col2 = st.columns(2)
 
-# =========================
 # INPUT
-# =========================
 with col1:
     st.subheader("📝 Jawab Pertanyaan")
-
-    total = 0
 
     for i, g in enumerate(gejala):
         val = st.toggle(g, key=f"g{i}")
         st.session_state.jawaban[i] = val
-        if val:
-            total += 1
 
-    st.progress(total / len(gejala))
-    st.caption(f"{total} dari {len(gejala)} gejala dipilih")
+    proses = st.button("🚀 Diagnosa")
+    
+    if st.button("🔄 Reset"):
+        st.session_state.clear()
+        st.rerun()
 
-    col_btn1, col_btn2 = st.columns(2)
-
-    with col_btn1:
-        proses = st.button("🚀 Diagnosa", use_container_width=True)
-
-    with col_btn2:
-        if st.button("🔄 Reset", use_container_width=True):
-            st.session_state.clear()
-            st.rerun()
-
-# =========================
 # OUTPUT
-# =========================
 with col2:
     st.subheader("📊 Hasil Diagnosa")
 
     if proses:
-
-        if total < 2:
-            st.warning("⚠️ Pilih minimal 2 gejala terlebih dahulu!")
+        if sum(st.session_state.jawaban) < 2:
+            st.warning("⚠️ Pilih minimal 2 gejala!")
         else:
-            skor = {}
+            engine = DiagnosaEngine()
+            engine.reset()
+            engine.run()
 
-            for penyakit, gejala_rule in rules.items():
-                total_bobot = sum(gejala_rule.values())
-                skor_penyakit = 0
+            hasil = []
 
-                for idx, bobot in gejala_rule.items():
-                    if st.session_state.jawaban[idx]:
-                        skor_penyakit += bobot
+            for fact in engine.facts.values():
+                if isinstance(fact, Fact) and "hasil" in fact:
+                    hasil.append(fact["hasil"])
 
-                skor[penyakit] = (skor_penyakit / total_bobot) * 100
-
-            # ranking
-            ranking = sorted(skor.items(), key=lambda x: x[1], reverse=True)
-
-            # grafik batang
-            st.bar_chart(skor)
-
-            # tampil hasil
-            for p, val in ranking:
-                st.write(f"{p}: {val:.1f}%")
-
-            terbaik = ranking[0][0]
-
-            st.divider()
-            st.error(f"🩺 Diagnosis: {terbaik}")
-            st.success(f"💡 Saran: {saran[terbaik]}")
+            if hasil:
+                for h in hasil:
+                    st.error(f"🩺 Diagnosis: {h}")
+            else:
+                st.info("❓ Diagnosis tidak ditemukan")
