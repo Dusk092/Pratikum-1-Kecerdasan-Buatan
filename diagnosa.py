@@ -9,110 +9,126 @@ st.set_page_config(
 )
 
 # =========================
-# JUDUL
+# HEADER
 # =========================
-st.title("🧠 Sistem Pakar Diagnosa Penyakit Gastro Usus")
-st.caption("Metode: Rule-Based Expert System (Forward Chaining)")
+st.markdown("""
+<h1 style='text-align: center;'>🧠 Sistem Pakar Diagnosa Gastro Usus</h1>
+<p style='text-align: center; color: gray;'>Forward Chaining - Rule Based Expert System</p>
+""", unsafe_allow_html=True)
+
+st.divider()
 
 # =========================
-# DATA GEJALA
+# DATA
 # =========================
 gejala = [
-    "Apakah Anda sering buang air besar (>2x)?",
-    "Apakah Anda mengalami berak encer?",
-    "Apakah Anda mengalami berak berdarah?",
-    "Apakah Anda merasa lesu dan tidak bergairah?",
-    "Apakah Anda tidak selera makan?",
-    "Apakah Anda merasa mual dan sering muntah?",
-    "Apakah Anda merasa sakit di bagian perut?",
-    "Apakah tekanan darah Anda rendah?",
-    "Apakah Anda merasa pusing?",
-    "Apakah Anda pernah pingsan?",
-    "Apakah suhu badan Anda tinggi?",
-    "Apakah Anda memiliki luka di bagian tertentu?",
-    "Apakah Anda tidak dapat menggerakkan anggota tubuh tertentu?",
-    "Apakah Anda memakan sesuatu sebelumnya?",
-    "Apakah Anda memakan daging?",
-    "Apakah Anda memakan jamur?",
-    "Apakah Anda memakan makanan kaleng?",
-    "Apakah Anda membeli susu?",
-    "Apakah Anda meminum susu?"
+    "Buang air besar lebih dari 2 kali",
+    "Berak encer",
+    "Berak berdarah",
+    "Lesu dan tidak bergairah",
+    "Tidak selera makan",
+    "Mual dan muntah",
+    "Sakit perut",
+    "Tekanan darah rendah",
+    "Pusing",
+    "Pingsan",
+    "Demam",
+    "Memakan daging",
+    "Memakan jamur",
+    "Memakan makanan kaleng",
+    "Meminum susu"
 ]
 
-# =========================
-# RULE
-# =========================
 rules = {
-    "Staphylococcus aureus": [0, 5, 18],
-    "Keracunan jamur beracun": [5, 6, 15],
-    "Salmonella": [1, 5, 10, 14],
-    "Clostridium botulinum": [5, 6, 16],
+    "Staphylococcus aureus": [1, 5, 14],
+    "Keracunan jamur beracun": [5, 6, 12],
+    "Salmonella": [1, 5, 10, 11],
+    "Clostridium botulinum": [5, 6, 13],
     "Campylobacter": [1, 10, 6]
 }
 
-# =========================
-# SARAN
-# =========================
 saran = {
-    "Staphylococcus aureus": "Hindari susu sementara, minum air banyak, dan istirahat.",
-    "Keracunan jamur beracun": "Segera ke rumah sakit, jangan konsumsi jamur liar.",
-    "Salmonella": "Minum oralit, istirahat, dan makan makanan matang.",
-    "Clostridium botulinum": "DARURAT! Segera ke dokter atau rumah sakit.",
-    "Campylobacter": "Jaga kebersihan makanan dan minum air yang cukup."
+    "Staphylococcus aureus": "Hindari susu dan minum banyak air.",
+    "Keracunan jamur beracun": "Segera ke rumah sakit.",
+    "Salmonella": "Minum oralit dan istirahat.",
+    "Clostridium botulinum": "DARURAT! Segera ke dokter.",
+    "Campylobacter": "Jaga kebersihan makanan."
 }
 
 # =========================
-# STATE
+# INIT STATE (AMAN)
 # =========================
 if "jawaban" not in st.session_state:
     st.session_state.jawaban = [False] * len(gejala)
 
 # =========================
-# FUNGSI HITUNG
-# =========================
-def hitung():
-    skor = {}
-    for p, r in rules.items():
-        cocok = sum([1 for i in r if st.session_state.jawaban[i]])
-        skor[p] = (cocok / len(r)) * 100
-    return skor
-
-# =========================
 # LAYOUT
 # =========================
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1, 1])
 
 # =========================
-# INPUT (KIRI)
+# INPUT
 # =========================
 with col1:
-    st.subheader("📝 Input Gejala")
+    st.subheader("📝 Jawab Pertanyaan")
 
+    total_terisi = 0
+
+    # gunakan key + sync ke jawaban
     for i, g in enumerate(gejala):
-        st.session_state.jawaban[i] = st.toggle(
-            g,
-            value=st.session_state.jawaban[i]
-        )
+        val = st.toggle(f"Apakah Anda {g}?", key=f"g{i}")
+        st.session_state.jawaban[i] = val
+        if val:
+            total_terisi += 1
 
-    progress = sum(st.session_state.jawaban) / len(gejala)
-    st.progress(progress)
+    st.progress(total_terisi / len(gejala))
+    st.caption(f"{total_terisi} dari {len(gejala)} gejala dipilih")
+
+    col_btn1, col_btn2 = st.columns(2)
+
+    with col_btn1:
+        proses = st.button("🚀 Diagnosa", use_container_width=True)
+
+    with col_btn2:
+        if st.button("🔄 Reset", use_container_width=True):
+            # RESET AMAN 100%
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
 
 # =========================
-# OUTPUT (KANAN)
+# OUTPUT
 # =========================
 with col2:
     st.subheader("📊 Hasil Diagnosa")
 
-    if st.button("🔍 Proses Diagnosa"):
-        skor = hitung()
+    if proses:
 
-        # tampil semua hasil
-        for p, val in skor.items():
-            st.write(f"{p}: {val:.1f}%")
+        if total_terisi < 2:
+            st.warning("⚠️ Pilih minimal 2 gejala terlebih dahulu!")
+        else:
+            skor = {}
 
-        terbaik = max(skor, key=skor.get)
+            for p, r in rules.items():
+                cocok = sum([1 for i in r if st.session_state.jawaban[i]])
+                skor[p] = (cocok / len(r)) * 100 if len(r) > 0 else 0
 
-        st.markdown("---")
-        st.error(f"🩺 Diagnosis: {terbaik}")
-        st.info(f"💡 Saran: {saran[terbaik]}")
-    
+            ranking = sorted(skor.items(), key=lambda x: x[1], reverse=True)
+
+            # =========================
+            # GRAFIK BATANG (SUPER STABIL)
+            # =========================
+            st.bar_chart(skor)
+
+            # =========================
+            # TEXT OUTPUT
+            # =========================
+            for p, val in ranking:
+                st.write(f"{p}: {val:.1f}%")
+
+            terbaik = ranking[0][0]
+
+            st.divider()
+
+            st.error(f"🩺 Diagnosis Utama: {terbaik}")
+            st.success(f"💡 Saran: {saran[terbaik]}")
