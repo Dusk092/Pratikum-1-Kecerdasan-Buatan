@@ -1,11 +1,3 @@
-# =========================
-# FIX EXPERTA
-# =========================
-import collections
-import collections.abc
-collections.Mapping = collections.abc.Mapping
-
-from experta import *
 import streamlit as st
 
 # =========================
@@ -17,8 +9,8 @@ st.set_page_config(page_title="Hybrid Sistem Pakar", layout="wide")
 # HEADER
 # =========================
 st.markdown("""
-<h1 style='text-align: center;'>🧠 Hybrid Sistem Pakar Diagnosa Penyakit</h1>
-<p style='text-align: center; color: gray;'>Experta + Forward Chaining + Persentase</p>
+<h1 style='text-align: center;'>🧠 Sistem Pakar Diagnosa Penyakit Pernapasan</h1>
+<p style='text-align: center; color: gray;'>Forward Chaining + Persentase (Hybrid)</p>
 """, unsafe_allow_html=True)
 
 st.divider()
@@ -45,9 +37,9 @@ gejala = [
 ]
 
 # =========================
-# RULE MANUAL (PERSEN)
+# RULE PERSENTASE
 # =========================
-rules_manual = {
+rules = {
     "COVID-19": {0:2,1:2,2:3,5:3,6:3,8:2},
     "Flu": {0:2,1:2,3:2,4:2,11:1,12:1},
     "Bronkitis": {1:2,2:3,13:2,14:2}
@@ -66,29 +58,7 @@ saran = {
 # STATE
 # =========================
 if "jawaban" not in st.session_state:
-    st.session_state.jawaban = [False]*len(gejala)
-
-# =========================
-# EXPERTA ENGINE
-# =========================
-class DiagnosaEngine(KnowledgeEngine):
-
-    @DefFacts()
-    def fakta(self):
-        for i, val in enumerate(st.session_state.jawaban):
-            yield Fact(**{f"g{i}": val})
-
-    @Rule(Fact(g0=True), Fact(g1=True), Fact(g2=True), Fact(g5=True))
-    def covid(self):
-        self.declare(Fact(hasil="COVID-19"))
-
-    @Rule(Fact(g0=True), Fact(g1=True), Fact(g3=True))
-    def flu(self):
-        self.declare(Fact(hasil="Flu"))
-
-    @Rule(Fact(g1=True), Fact(g2=True))
-    def bronkitis(self):
-        self.declare(Fact(hasil="Bronkitis"))
+    st.session_state.jawaban = [False] * len(gejala)
 
 # =========================
 # LAYOUT
@@ -108,16 +78,16 @@ with col1:
         if val:
             total += 1
 
-    st.progress(total/len(gejala))
+    st.progress(total / len(gejala))
     st.caption(f"{total} dari {len(gejala)} gejala dipilih")
 
     col_btn1, col_btn2 = st.columns(2)
 
     with col_btn1:
-        proses = st.button("🚀 Diagnosa")
+        proses = st.button("🚀 Diagnosa", use_container_width=True)
 
     with col_btn2:
-        if st.button("🔄 Reset"):
+        if st.button("🔄 Reset", use_container_width=True):
             st.session_state.clear()
             st.rerun()
 
@@ -128,28 +98,43 @@ with col2:
     st.subheader("📊 Hasil Diagnosa")
 
     if proses:
+
         if total < 2:
             st.warning("⚠️ Pilih minimal 2 gejala!")
         else:
 
             # =========================
-            # EXPERTA
+            # FORWARD CHAINING (SIMULASI EXPERTA)
             # =========================
-            engine = DiagnosaEngine()
-            engine.reset()
-            engine.run()
-
             hasil_experta = []
-            for fact in engine.facts.values():
-                if isinstance(fact, Fact) and "hasil" in fact:
-                    hasil_experta.append(fact["hasil"])
+
+            if (
+                st.session_state.jawaban[0] and
+                st.session_state.jawaban[1] and
+                st.session_state.jawaban[2] and
+                st.session_state.jawaban[5]
+            ):
+                hasil_experta.append("COVID-19")
+
+            elif (
+                st.session_state.jawaban[0] and
+                st.session_state.jawaban[1] and
+                st.session_state.jawaban[3]
+            ):
+                hasil_experta.append("Flu")
+
+            elif (
+                st.session_state.jawaban[1] and
+                st.session_state.jawaban[2]
+            ):
+                hasil_experta.append("Bronkitis")
 
             # =========================
-            # MANUAL (PERSEN)
+            # PERHITUNGAN PERSENTASE
             # =========================
             skor = {}
 
-            for penyakit, rule in rules_manual.items():
+            for penyakit, rule in rules.items():
                 total_bobot = sum(rule.values())
                 skor_penyakit = 0
 
@@ -167,7 +152,7 @@ with col2:
             st.bar_chart(skor)
 
             # =========================
-            # OUTPUT PERSEN
+            # HASIL PERSEN
             # =========================
             for p, val in ranking:
                 st.write(f"{p}: {val:.1f}%")
@@ -175,11 +160,12 @@ with col2:
             st.divider()
 
             # =========================
-            # HASIL EXPERTA
+            # HASIL DIAGNOSA (SIMULASI EXPERTA)
             # =========================
             if hasil_experta:
                 utama = hasil_experta[0]
-                st.error(f"🩺 Diagnosis (Experta): {utama}")
-                st.success(f"💡 Saran: {saran[utama]}")
             else:
-                st.info("❓ Tidak ditemukan rule pasti (Experta)")
+                utama = ranking[0][0]
+
+            st.error(f"🩺 Diagnosis: {utama}")
+            st.success(f"💡 Saran: {saran[utama]}")
