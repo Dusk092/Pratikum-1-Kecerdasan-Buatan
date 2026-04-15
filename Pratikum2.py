@@ -3,55 +3,86 @@ import streamlit as st
 # =========================
 # CONFIG
 # =========================
-st.set_page_config(page_title="Hybrid Sistem Pakar", layout="wide")
+st.set_page_config(page_title="Diagnosa Pernapasan", layout="wide")
 
 # =========================
-# HEADER
+# CUSTOM CSS (MINIMAL CLEAN)
 # =========================
 st.markdown("""
-<h1 style='text-align: center;'>🧠 Sistem Pakar Diagnosa Penyakit Pernapasan</h1>
-<p style='text-align: center; color: gray;'>Forward Chaining + Persentase (Hybrid)</p>
+<style>
+.main {
+    background-color: #f1f5f9;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 15px;
+}
+
+h1 {
+    text-align: center;
+    color: #0f172a;
+}
+
+.subtitle {
+    text-align: center;
+    color: #64748b;
+    margin-bottom: 20px;
+}
+
+.stButton>button {
+    border-radius: 8px;
+    background-color: #2563eb;
+    color: white;
+    font-weight: 500;
+}
+
+.stProgress > div > div {
+    background-color: #2563eb;
+}
+</style>
 """, unsafe_allow_html=True)
 
-st.divider()
+# =========================
+# HEADER (LEBIH NATURAL)
+# =========================
+st.markdown("<h1>Sistem Diagnosa Penyakit Pernapasan</h1>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Analisis gejala untuk membantu diagnosis awal</div>", unsafe_allow_html=True)
 
 # =========================
-# GEJALA
+# DATA
 # =========================
 gejala = [
-    "Apakah Anda mengalami demam?",
-    "Apakah Anda mengalami batuk?",
-    "Apakah Anda mengalami sesak napas?",
-    "Apakah Anda mengalami pilek?",
-    "Apakah Anda mengalami sakit tenggorokan?",
-    "Apakah Anda kehilangan penciuman?",
-    "Apakah Anda kehilangan rasa?",
-    "Apakah Anda mengalami sakit kepala?",
-    "Apakah Anda merasa lemas?",
-    "Apakah Anda mengalami nyeri otot?",
-    "Apakah Anda menggigil?",
-    "Apakah Anda mengalami hidung tersumbat?",
-    "Apakah Anda bersin-bersin?",
-    "Apakah Anda mengalami batuk berdahak?",
-    "Apakah Anda merasa dada terasa berat?"
+    "Demam",
+    "Batuk",
+    "Sesak napas",
+    "Pilek",
+    "Sakit tenggorokan",
+    "Kehilangan penciuman",
+    "Kehilangan rasa",
+    "Sakit kepala",
+    "Lemas",
+    "Nyeri otot",
+    "Menggigil",
+    "Hidung tersumbat",
+    "Bersin-bersin",
+    "Batuk berdahak",
+    "Dada terasa berat"
 ]
 
-# =========================
-# RULE PERSENTASE
-# =========================
 rules = {
     "COVID-19": {0:2,1:2,2:3,5:3,6:3,8:2},
     "Flu": {0:2,1:2,3:2,4:2,11:1,12:1},
     "Bronkitis": {1:2,2:3,13:2,14:2}
 }
 
-# =========================
-# SARAN
-# =========================
 saran = {
-    "COVID-19": "Isolasi mandiri dan periksa ke fasilitas kesehatan.",
-    "Flu": "Istirahat, minum air hangat, dan konsumsi vitamin.",
-    "Bronkitis": "Hindari asap dan konsultasi ke dokter."
+    "COVID-19": "Disarankan melakukan pemeriksaan lanjutan dan membatasi kontak.",
+    "Flu": "Istirahat cukup, konsumsi cairan hangat, dan vitamin.",
+    "Bronkitis": "Hindari asap dan konsultasikan ke tenaga medis."
 }
 
 # =========================
@@ -69,103 +100,97 @@ col1, col2 = st.columns(2)
 # INPUT
 # =========================
 with col1:
-    st.subheader("📝 Jawab Pertanyaan")
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+
+    st.subheader("Gejala")
 
     total = 0
+
     for i, g in enumerate(gejala):
-        val = st.toggle(g, key=f"g{i}")
+        val = st.checkbox(g, key=f"g{i}")
         st.session_state.jawaban[i] = val
         if val:
             total += 1
 
     st.progress(total / len(gejala))
-    st.caption(f"{total} dari {len(gejala)} gejala dipilih")
+    st.caption(f"{total} gejala dipilih")
 
-    col_btn1, col_btn2 = st.columns(2)
+    proses = st.button("Proses")
+    reset = st.button("Reset")
 
-    with col_btn1:
-        proses = st.button("🚀 Diagnosa", use_container_width=True)
+    if reset:
+        st.session_state.clear()
+        st.rerun()
 
-    with col_btn2:
-        if st.button("🔄 Reset", use_container_width=True):
-            st.session_state.clear()
-            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # =========================
 # OUTPUT
 # =========================
 with col2:
-    st.subheader("📊 Hasil Diagnosa")
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+
+    st.subheader("Hasil")
 
     if proses:
 
         if total < 2:
-            st.warning("⚠️ Pilih minimal 2 gejala!")
+            st.warning("Minimal pilih dua gejala.")
         else:
 
-            # =========================
-            # FORWARD CHAINING (SIMULASI EXPERTA)
-            # =========================
-            hasil_experta = []
+            with st.spinner("Memproses data..."):
 
-            if (
-                st.session_state.jawaban[0] and
-                st.session_state.jawaban[1] and
-                st.session_state.jawaban[2] and
-                st.session_state.jawaban[5]
-            ):
-                hasil_experta.append("COVID-19")
+                # Forward chaining sederhana
+                hasil_rule = []
 
-            elif (
-                st.session_state.jawaban[0] and
-                st.session_state.jawaban[1] and
-                st.session_state.jawaban[3]
-            ):
-                hasil_experta.append("Flu")
+                if (
+                    st.session_state.jawaban[0] and
+                    st.session_state.jawaban[1] and
+                    st.session_state.jawaban[2] and
+                    st.session_state.jawaban[5]
+                ):
+                    hasil_rule.append("COVID-19")
 
-            elif (
-                st.session_state.jawaban[1] and
-                st.session_state.jawaban[2]
-            ):
-                hasil_experta.append("Bronkitis")
+                elif (
+                    st.session_state.jawaban[0] and
+                    st.session_state.jawaban[1] and
+                    st.session_state.jawaban[3]
+                ):
+                    hasil_rule.append("Flu")
 
-            # =========================
-            # PERHITUNGAN PERSENTASE
-            # =========================
-            skor = {}
+                elif (
+                    st.session_state.jawaban[1] and
+                    st.session_state.jawaban[2]
+                ):
+                    hasil_rule.append("Bronkitis")
 
-            for penyakit, rule in rules.items():
-                total_bobot = sum(rule.values())
-                skor_penyakit = 0
+                # Skor persentase
+                skor = {}
 
-                for idx, bobot in rule.items():
-                    if st.session_state.jawaban[idx]:
-                        skor_penyakit += bobot
+                for penyakit, rule in rules.items():
+                    total_bobot = sum(rule.values())
+                    skor_penyakit = sum(
+                        bobot for idx, bobot in rule.items()
+                        if st.session_state.jawaban[idx]
+                    )
+                    skor[penyakit] = (skor_penyakit / total_bobot) * 100
 
-                skor[penyakit] = (skor_penyakit / total_bobot) * 100
+                ranking = sorted(skor.items(), key=lambda x: x[1], reverse=True)
 
-            ranking = sorted(skor.items(), key=lambda x: x[1], reverse=True)
-
-            # =========================
-            # GRAFIK
-            # =========================
-            st.bar_chart(skor)
-
-            # =========================
-            # HASIL PERSEN
-            # =========================
-            for p, val in ranking:
-                st.write(f"{p}: {val:.1f}%")
-
-            st.divider()
-
-            # =========================
-            # HASIL DIAGNOSA (SIMULASI EXPERTA)
-            # =========================
-            if hasil_experta:
-                utama = hasil_experta[0]
+            # hasil utama
+            if hasil_rule:
+                utama = hasil_rule[0]
             else:
                 utama = ranking[0][0]
 
-            st.error(f"🩺 Diagnosis: {utama}")
-            st.success(f"💡 Saran: {saran[utama]}")
+            st.success(f"Kemungkinan terbesar: {utama}")
+            st.write(saran[utama])
+
+            st.divider()
+
+            # progress instead of chart (lebih natural)
+            for p, val in ranking:
+                st.progress(val / 100)
+                st.caption(f"{p} ({val:.1f}%)")
+
+    st.markdown("</div>", unsafe_allow_html=True)
