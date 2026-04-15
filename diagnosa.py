@@ -4,19 +4,57 @@ import streamlit as st
 # CONFIG
 # =========================
 st.set_page_config(
-    page_title="Sistem Pakar Gastro Usus",
+    page_title="Diagnosa Sistem Pencernaan",
     layout="wide"
 )
 
 # =========================
-# HEADER
+# CUSTOM CSS (LIGHT MEDICAL)
 # =========================
 st.markdown("""
-<h1 style='text-align: center;'>🧠 Sistem Pakar Diagnosa Gastro Usus</h1>
-<p style='text-align: center; color: gray;'>Forward Chaining - Rule Based Expert System</p>
+<style>
+.main {
+    background-color: #f8fafc;
+}
+
+.card {
+    background-color: white;
+    padding: 20px;
+    border-radius: 14px;
+    margin-bottom: 15px;
+    border: 1px solid #e2e8f0;
+}
+
+h1 {
+    color: #065f46;
+}
+
+h2, h3 {
+    color: #0f172a;
+}
+
+.stButton>button {
+    border-radius: 10px;
+    background-color: #10b981;
+    color: white;
+    font-weight: 600;
+}
+
+.stProgress > div > div {
+    background-color: #10b981;
+}
+</style>
 """, unsafe_allow_html=True)
 
-st.divider()
+# =========================
+# HEADER (ICON DIGANTI)
+# =========================
+st.markdown("""
+<div style='text-align:center; margin-bottom:25px'>
+    <h1>🩺 Sistem Pakar Gangguan Pencernaan</h1>
+    <p style='color:#64748b;'>Analisis gejala untuk diagnosis awal gangguan gastro-usus</p>
+</div>
+""", unsafe_allow_html=True)
 
 # =========================
 # DATA
@@ -48,15 +86,15 @@ rules = {
 }
 
 saran = {
-    "Staphylococcus aureus": "Hindari susu dan minum banyak air.",
+    "Staphylococcus aureus": "Hindari susu dan perbanyak cairan.",
     "Keracunan jamur beracun": "Segera ke rumah sakit.",
-    "Salmonella": "Minum oralit dan istirahat.",
-    "Clostridium botulinum": "DARURAT! Segera ke dokter.",
+    "Salmonella": "Istirahat dan minum oralit.",
+    "Clostridium botulinum": "Segera ke dokter (darurat).",
     "Campylobacter": "Jaga kebersihan makanan."
 }
 
 # =========================
-# INIT STATE (AMAN)
+# SESSION
 # =========================
 if "jawaban" not in st.session_state:
     st.session_state.jawaban = [False] * len(gejala)
@@ -70,65 +108,61 @@ col1, col2 = st.columns([1, 1])
 # INPUT
 # =========================
 with col1:
-    st.subheader("📝 Jawab Pertanyaan")
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-    total_terisi = 0
+    st.subheader("Form Gejala")
 
-    # gunakan key + sync ke jawaban
+    total = 0
+
     for i, g in enumerate(gejala):
-        val = st.toggle(f"Apakah Anda {g}?", key=f"g{i}")
+        val = st.checkbox(g, key=f"g{i}")
         st.session_state.jawaban[i] = val
         if val:
-            total_terisi += 1
+            total += 1
 
-    st.progress(total_terisi / len(gejala))
-    st.caption(f"{total_terisi} dari {len(gejala)} gejala dipilih")
+    st.progress(total / len(gejala))
+    st.caption(f"{total} gejala dipilih")
 
-    col_btn1, col_btn2 = st.columns(2)
+    proses = st.button("Proses Diagnosa")
+    reset = st.button("Reset")
 
-    with col_btn1:
-        proses = st.button("🚀 Diagnosa", use_container_width=True)
+    if reset:
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
 
-    with col_btn2:
-        if st.button("🔄 Reset", use_container_width=True):
-            # RESET AMAN 100%
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # =========================
 # OUTPUT
 # =========================
 with col2:
-    st.subheader("📊 Hasil Diagnosa")
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+
+    st.subheader("Hasil Diagnosis")
 
     if proses:
 
-        if total_terisi < 2:
-            st.warning("⚠️ Pilih minimal 2 gejala terlebih dahulu!")
+        if total < 2:
+            st.warning("Minimal pilih 2 gejala.")
         else:
-            skor = {}
+            with st.spinner("Sedang menganalisis..."):
+                skor = {}
 
-            for p, r in rules.items():
-                cocok = sum([1 for i in r if st.session_state.jawaban[i]])
-                skor[p] = (cocok / len(r)) * 100 if len(r) > 0 else 0
+                for p, r in rules.items():
+                    cocok = sum([1 for i in r if st.session_state.jawaban[i]])
+                    skor[p] = (cocok / len(r)) * 100
 
-            ranking = sorted(skor.items(), key=lambda x: x[1], reverse=True)
+                ranking = sorted(skor.items(), key=lambda x: x[1], reverse=True)
+                utama = ranking[0][0]
 
-            # =========================
-            # GRAFIK BATANG (SUPER STABIL)
-            # =========================
-            st.bar_chart(skor)
-
-            # =========================
-            # TEXT OUTPUT
-            # =========================
-            for p, val in ranking:
-                st.write(f"{p}: {val:.1f}%")
-
-            terbaik = ranking[0][0]
+            st.success(f"Hasil utama: {utama}")
+            st.info(saran[utama])
 
             st.divider()
 
-            st.error(f"🩺 Diagnosis Utama: {terbaik}")
-            st.success(f"💡 Saran: {saran[terbaik]}")
+            for p, val in ranking:
+                st.progress(val / 100)
+                st.caption(f"{p} ({val:.1f}%)")
+
+    st.markdown("</div>", unsafe_allow_html=True)
